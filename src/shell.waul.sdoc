@@ -6,25 +6,30 @@ The Caterwaul shell gives you a drop-in Caterwaul REPL that you can place on a p
 provides events for occurrences like autocompletion. You can also use Catastrophe (https://github.com/spencertipping/catastrophe) to trace the execution of shell commands.
 
 caterwaul.module('shell', ':all', function ($) {
-  $.shell(context, compiler) = jquery in input.caterwaul_shell /modus($.shell.val, $.shell.val) /on('keydown keypress keyup', $.shell.handle_interaction),
+  $.shell(context, compiler) = jquery in input.caterwaul_shell /modus($.shell.val, $.shell.val) /on('keydown keypress keyup', $.shell.handle_interaction)
+                                                               /val  ({context_: context, compiler_: compiler} /!$.shell.state),
   $.shell /-$.merge/ wcapture [
 
 State modeling.
 The shell is always in an edit state. History searching and autocompletion are implemented as functions over states, but you cannot set the editor to be in the "reverse-searching history" state, for
 instance.
 
-  compiler        = $(':all'),
-  val(s)          = s ? $(this).data('caterwaul-shell-state', s).modus('val', s.text_).caret(s.selection_range_) : $(this).data('caterwaul-shell-state') /or.{} /!construct_state,
-  state(settings) = new state_ctor(settings.history_         || [],                 settings.values_  || [],     settings.text_     || '',
-                                   settings.selection_range_ || {start: 0, end: 0}, settings.context_ || window, settings.compiler_ || compiler),
+  compiler                    = $(':all'),
+  val(s, self = jQuery(this)) = s ? self.data('caterwaul-shell-state', s).modus('val', s.text_) -se- it.caret(s.selection_)
+                                  : {} / self.data('caterwaul-shell-state') /-$.merge/ {text_: self.modus('val'), selection_: self.caret()} /!state,
 
-  state_ctor      = given [history, values, results, text, selection_range, context, compiler]
-                          [this.history_         = history,         this.values_  = values,  this.text_     = text,
-                           this.selection_range_ = selection_range, this.context_ = context, this.compiler_ = compiler, null] -se- it.prototype /-$.merge/
+  state(settings) = new state_ctor(settings.history_   || [],                 settings.values_  || [],     settings.text_     || '',
+                                   settings.selection_ || {start: 0, end: 0}, settings.context_ || window, settings.compiler_ || compiler),
+
+  state_ctor      = given [history, values, text, selection, context, compiler]
+                          [this.history_   = history,   this.values_  = values,  this.text_     = text,
+                           this.selection_ = selection, this.context_ = context, this.compiler_ = compiler, null] -se- it.prototype /-$.merge/
 
                     capture [is_valid() = this.compiler_.parse(this.text_) -then- true -rescue- false,
                              modify(o)  = {} / this /-$.merge/ o /!state,
-                             accept(c)  = this /~modify/ {text_: this.text_ + String.fromCharCode(c), selection_range_: {start: this.selection_range_.start + 1, end: this.selection_range_.start + 1}},
+                             accept(c)  = this /~modify/ {text_:      '#{this.text_.substr(0, this.selection_.start)}#{String.fromCharCode(c)}#{this.text_.substr(this.selection_.end)}',
+                                                          selection_: {start: this.selection_.start + 1, end: this.selection_.start + 1}},
+
                              evaluate() = {values_:  this.values_  /~concat/ [{value: this.compiler_(this.text_, this.context_)} -rescue- {error: e}],
                                            history_: this.history_ /~concat/ [this.text_], context_: this.context_, compiler_: this.compiler_} /!state],
 
@@ -33,5 +38,6 @@ All interaction is triggered by keypress and keyup events on the input element. 
 things like <tab> for autocompletion and Ctrl+R for history searching. Ctrl+W deletes a word backwards, Ctrl+U nukes from the cursor to the beginning of the line. This interaction is modeled in terms of
 immutable state objects that can be retrieved and set by using the val() method.
 
-  handle_interaction(e, self = jQuery(this)) = interact.call(self, self.val(), e) /!self.val,
-  interact(s, e)                             = e.type === 'keypress' ? e.which === 13 ? s.evaluate() : s.accept(e.which) : s]});
+  handle_interaction(e, self = jQuery(this), old_state = self.val(), new_state = interact.call(self, old_state, e)) = new_state !== old_state ? self.val(new_state) -then- false : true,
+
+  interact(s, e) = e.type === 'keypress' ? e.which === 13 ? s.evaluate() : s.accept(e.which) : s]});

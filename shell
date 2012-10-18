@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # 99aeabc9ec7fe80b1b39f5e53dc7e49e      <- self-modifying Perl magic
-# state:  f32988a2e1d44a294d1be97454a842b8
-# istate: 30170e9d755db75bc7417880973a9a6e
+# state:  1af65dbd993df58e73fbd2e34d7c36d9
+# istate: 2cd384ec2c898a01a86d1ad143bcfe28
 # id:     38facb30c331b6e5259cb84f9e6e975a
 
 # This is a self-modifying Perl file. I'm sorry you're viewing the source (it's
@@ -247,6 +247,7 @@ meta::functor::editable 'waul', inherit => 1, extension => '.waul', default => '
 __
 meta::alias('e', 'edit sdoc::waul::shell');
 meta::alias('erf', 'edit function::render');
+meta::alias('es', 'edit sdoc::shell.css');
 meta::bootstrap('html', <<'__');
 <html>
   <head>
@@ -725,7 +726,10 @@ file::write('src/shell.md',        retrieve('markdown::waul::shell'));
 
 sh('waul src/shell.waul.sdoc') unless $$options{-W};
 
-file::write('shell.js', cat('src/shell.js'));
+file::write('shell.css', retrieve('code.css::sdoc::shell.css'));
+
+file::write('caterwaul-shell.js', cat('src/shell.js'));
+file::write('shell.js',           cat(qw|deps/jquery.caret.1.02.js deps/caterwaul.js deps/caterwaul.std.js deps/caterwaul.ui.js deps/modus.js caterwaul-shell.js|));
 minify_uglify('shell.js', '-m') unless $$options{-W} || $$options{-M};
 
 __
@@ -1769,6 +1773,14 @@ return undef unless $_[0] =~ /^sdocp::(.*)$/;
 exists $data{"sdoc::$1"} ? sdocp("sdoc::$1") : undef;
 
 __
+meta::sdoc('shell.css', <<'__');
+Caterwaul shell stylesheet | Spencer Tipping
+Licensed under the terms of the MIT source code license
+
+.caterwaul-shell {border-width: 0 0 0 1px; border-color: #fa4; border-style: dotted; padding: 2px; font-family: monospace; font-weight: bold; font-size: 8pt; color: white; background: rgba(0,0,0,0.7)}
+.caterwaul-shell:focus {border-style: solid; outline: none !important}
+
+__
 meta::sdoc('waul::shell', <<'__');
 Caterwaul shell | Spencer Tipping
 Licensed under the terms of the MIT source code license
@@ -1778,25 +1790,30 @@ The Caterwaul shell gives you a drop-in Caterwaul REPL that you can place on a p
 provides events for occurrences like autocompletion. You can also use Catastrophe (https://github.com/spencertipping/catastrophe) to trace the execution of shell commands.
 
 caterwaul.module('shell', ':all', function ($) {
-  $.shell(context, compiler) = jquery in input.caterwaul_shell /modus($.shell.val, $.shell.val) /on('keydown keypress keyup', $.shell.handle_interaction),
+  $.shell(context, compiler) = jquery in input.caterwaul_shell /modus($.shell.val, $.shell.val) /on('keydown keypress keyup', $.shell.handle_interaction)
+                                                               /val  ({context_: context, compiler_: compiler} /!$.shell.state),
   $.shell /-$.merge/ wcapture [
 
 State modeling.
 The shell is always in an edit state. History searching and autocompletion are implemented as functions over states, but you cannot set the editor to be in the "reverse-searching history" state, for
 instance.
 
-  compiler        = $(':all'),
-  val(s)          = s ? $(this).data('caterwaul-shell-state', s).modus('val', s.text_).caret(s.selection_range_) : $(this).data('caterwaul-shell-state') /or.{} /!construct_state,
-  state(settings) = new state_ctor(settings.history_         || [],                 settings.values_  || [],     settings.text_     || '',
-                                   settings.selection_range_ || {start: 0, end: 0}, settings.context_ || window, settings.compiler_ || compiler),
+  compiler                    = $(':all'),
+  val(s, self = jQuery(this)) = s ? self.data('caterwaul-shell-state', s).modus('val', s.text_) -se- it.caret(s.selection_)
+                                  : {} / self.data('caterwaul-shell-state') /-$.merge/ {text_: self.modus('val'), selection_: self.caret()} /!state,
 
-  state_ctor      = given [history, values, results, text, selection_range, context, compiler]
-                          [this.history_         = history,         this.values_  = values,  this.text_     = text,
-                           this.selection_range_ = selection_range, this.context_ = context, this.compiler_ = compiler, null] -se- it.prototype /-$.merge/
+  state(settings) = new state_ctor(settings.history_   || [],                 settings.values_  || [],     settings.text_     || '',
+                                   settings.selection_ || {start: 0, end: 0}, settings.context_ || window, settings.compiler_ || compiler),
+
+  state_ctor      = given [history, values, text, selection, context, compiler]
+                          [this.history_   = history,   this.values_  = values,  this.text_     = text,
+                           this.selection_ = selection, this.context_ = context, this.compiler_ = compiler, null] -se- it.prototype /-$.merge/
 
                     capture [is_valid() = this.compiler_.parse(this.text_) -then- true -rescue- false,
                              modify(o)  = {} / this /-$.merge/ o /!state,
-                             accept(c)  = this /~modify/ {text_: this.text_ + String.fromCharCode(c), selection_range_: {start: this.selection_range_.start + 1, end: this.selection_range_.start + 1}},
+                             accept(c)  = this /~modify/ {text_:      '#{this.text_.substr(0, this.selection_.start)}#{String.fromCharCode(c)}#{this.text_.substr(this.selection_.end)}',
+                                                          selection_: {start: this.selection_.start + 1, end: this.selection_.start + 1}},
+
                              evaluate() = {values_:  this.values_  /~concat/ [{value: this.compiler_(this.text_, this.context_)} -rescue- {error: e}],
                                            history_: this.history_ /~concat/ [this.text_], context_: this.context_, compiler_: this.compiler_} /!state],
 
@@ -1805,8 +1822,9 @@ All interaction is triggered by keypress and keyup events on the input element. 
 things like <tab> for autocompletion and Ctrl+R for history searching. Ctrl+W deletes a word backwards, Ctrl+U nukes from the cursor to the beginning of the line. This interaction is modeled in terms of
 immutable state objects that can be retrieved and set by using the val() method.
 
-  handle_interaction(e, self = jQuery(this)) = interact.call(self, self.val(), e) /!self.val,
-  interact(s, e)                             = e.type === 'keypress' ? e.which === 13 ? s.evaluate() : s.accept(e.which) : s]});
+  handle_interaction(e, self = jQuery(this), old_state = self.val(), new_state = interact.call(self, old_state, e)) = new_state !== old_state ? self.val(new_state) -then- false : true,
+
+  interact(s, e) = e.type === 'keypress' ? e.which === 13 ? s.evaluate() : s.accept(e.which) : s]});
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');
