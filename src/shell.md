@@ -17,23 +17,33 @@ The shell is always in an edit state. History searching and autocompletion are i
 instance.
 
       compiler                    = $(':all'),
-      val(s, self = jQuery(this)) = s ? self.data('caterwaul-shell-state', s).modus('val', s.text_) -se- it.caret(s.selection_)
+      val(s, self = jQuery(this)) = s ? self.data('caterwaul-shell-state', s).modus('val', s.text_).toggleClass('error', !s.is_valid()) <se> it.caret(s.selection_)
                                       : {} / self.data('caterwaul-shell-state') /-$.merge/ {text_: self.modus('val'), selection_: self.caret()} /!state,
 
-      state(settings) = new state_ctor(settings.history_   || [],                 settings.values_  || [],     settings.text_     || '',
-                                       settings.selection_ || {start: 0, end: 0}, settings.context_ || window, settings.compiler_ || compiler),
+      state(settings) = new state_ctor(settings.history_   || {before: [], after: []},                settings.values_  || [],     text,
+                                       settings.selection_ || {start: text.length, end: text.length}, settings.context_ || window, settings.compiler_ || compiler) -where [text = settings.text_ || ''],
 
       state_ctor      = given [history, values, text, selection, context, compiler]
                               [this.history_   = history,   this.values_  = values,  this.text_     = text,
                                this.selection_ = selection, this.context_ = context, this.compiler_ = compiler, null] -se- it.prototype /-$.merge/
 
-                        capture [is_valid() = this.compiler_.parse(this.text_) -then- true -rescue- false,
+                        capture [is_valid() = $.parse(this.text_) -then- true -rescue- false,
                                  modify(o)  = {} / this /-$.merge/ o /!state,
                                  accept(c)  = this /~modify/ {text_:      '#{this.text_.substr(0, this.selection_.start)}#{String.fromCharCode(c)}#{this.text_.substr(this.selection_.end)}',
-                                                              selection_: {start: this.selection_.start + 1, end: this.selection_.start + 1}},
+                                                              selection_: {start: this.selection_.start + 1, end: this.selection_.end + 1}},
 
-                                 evaluate() = {values_:  this.values_  /~concat/ [{value: this.compiler_(this.text_, this.context_)} -rescue- {error: e}],
-                                               history_: this.history_ /~concat/ [this.text_], context_: this.context_, compiler_: this.compiler_} /!state],
+                                 previous() = this.history_.before.length ? this /~modify/ {history_:   {before: this.history_.before.slice(0, this.history_.before.length - 1),
+                                                                                                         after:  [this.text_] /~concat/ this.history_.after},
+                                                                                            text_:      this.history_.before[this.history_.before.length - 1],
+                                                                                            selection_: null} : this,
+
+                                 next()     = this.history_.after.length  ? this /~modify/ {history_:   {before: this.history_.before /~concat/ [this.text_], after: this.history_.after.slice(1)},
+                                                                                            text_:      this.history_.after[0],
+                                                                                            selection_: null} : this,
+
+                                 evaluate() = {history_: {before: this.history_.before /~concat/ this.history_.after /~concat/ [this.text_], after: []},
+                                               values_:  this.values_ /~concat/ [{value: this.compiler_(this.text_, this.context_)} -rescue- {error: e}],
+                                               context_: this.context_, compiler_: this.compiler_} /!state],
 
 # Interaction
 
@@ -43,4 +53,7 @@ immutable state objects that can be retrieved and set by using the val() method.
 
       handle_interaction(e, self = jQuery(this), old_state = self.val(), new_state = interact.call(self, old_state, e)) = new_state !== old_state ? self.val(new_state) -then- false : true,
 
-      interact(s, e) = e.type === 'keypress' ? e.which === 13 ? s.evaluate() : s.accept(e.which) : s]});
+      interact(s, e) = e.type === 'keypress' ? e.which === 13 ? s.evaluate() : s.accept(e.which)
+                     : e.type === 'keydown'  ? e.which === 38 ? s.previous()
+                                             : e.which === 40 ? s.next() : s
+                     : s]});
