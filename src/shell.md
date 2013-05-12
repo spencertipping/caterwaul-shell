@@ -17,8 +17,8 @@ The shell is always in an edit state. History searching and autocompletion are i
 instance.
 
       compiler                    = $(':all'),
-      val(s, self = jQuery(this)) = s ? self.data('caterwaul-shell-state', s).modus('val', s.text_).toggleClass('error', !s.is_valid()) <se> it.caret(s.selection_)
-                                      : {} / self.data('caterwaul-shell-state') /-$.merge/ {text_: self.modus('val'), selection_: self.caret()} /!state,
+      val(s, self = jQuery(this)) = s ? self.data('caterwaul-shell-state', s).modus('val', s.text_).toggleClass('error', !s.is_valid())
+                                      : {} / self.data('caterwaul-shell-state') /-$.merge/ {text_: self.modus('val')} /!state,
 
       state(settings) = new state_ctor(settings.history_   || {before: [], after: []},                settings.values_  || [],     text,
                                        settings.selection_ || {start: text.length, end: text.length}, settings.context_ || window, settings.compiler_ || compiler) -where [text = settings.text_ || ''],
@@ -56,4 +56,12 @@ immutable state objects that can be retrieved and set by using the val() method.
       interact(s, e) = e.type === 'keypress' ? e.which === 13 ? s.evaluate() : s.accept(e.which)
                      : e.type === 'keydown'  ? e.which === 38 ? s.previous()
                                              : e.which === 40 ? s.next() : s
-                     : s]});
+                     : s
+
+# Autocompletion
+
+We can trivially autocomplete any subexpression that does not involve a method call. To do this, we need to very primitively lex the input starting backwards from the current selection point and ending
+at either the beginning of the string, or at the nearest non-dereferencing character. We keep a bracket count to handle parenthesized subexpressions and bracketed dereferencing. For simplicity we assume
+that all brackets are balanced with the right kind of opposing bracket. (I believe the parser will complain if this is not the case.)
+
+                     ]});

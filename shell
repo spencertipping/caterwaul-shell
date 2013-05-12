@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 # 99aeabc9ec7fe80b1b39f5e53dc7e49e      <- self-modifying Perl magic
-# state:  fc9faf146460ce860122f9ec90d30547
-# istate: 68df135941b31702a132e54d6edb0700
+# state:  f44112fc620c030d0db4633366161e53
+# istate: f3586e90510f07987a50465ab44d9f1c
 # id:     38facb30c331b6e5259cb84f9e6e975a
 
 # This is a self-modifying Perl file. I'm sorry you're viewing the source (it's
@@ -1777,10 +1777,11 @@ meta::sdoc('shell.css', <<'__');
 Caterwaul shell stylesheet | Spencer Tipping
 Licensed under the terms of the MIT source code license
 
-.caterwaul-shell {border-width: 0 0 0 1px; border-color: #fa4; border-style: dotted; padding: 2px; font-family: monospace; font-weight: bold; font-size: 8pt; color: white; background: rgba(0,0,0,0.7)}
-.caterwaul-shell:focus {border-style: solid; outline: none !important}
+.caterwaul-shell              {border: solid 1px #ccc; outline: none !important; padding: 2px; font-family: monospace; font-weight: bold; font-size: 8pt; color: #444; min-width: 50em}
+.caterwaul-shell:before       {font-family: monospace; color: #aaa; text: content('>>')}
+.caterwaul-shell:focus:before {color: #fa4}
 
-.caterwaul-shell.error {background: rgba(128,0,0,0.7)}
+.caterwaul-shell.error {color: #800}
 
 __
 meta::sdoc('waul::shell', <<'__');
@@ -1801,8 +1802,8 @@ The shell is always in an edit state. History searching and autocompletion are i
 instance.
 
   compiler                    = $(':all'),
-  val(s, self = jQuery(this)) = s ? self.data('caterwaul-shell-state', s).modus('val', s.text_).toggleClass('error', !s.is_valid()) <se> it.caret(s.selection_)
-                                  : {} / self.data('caterwaul-shell-state') /-$.merge/ {text_: self.modus('val'), selection_: self.caret()} /!state,
+  val(s, self = jQuery(this)) = s ? self.data('caterwaul-shell-state', s).modus('val', s.text_).toggleClass('error', !s.is_valid())
+                                  : {} / self.data('caterwaul-shell-state') /-$.merge/ {text_: self.modus('val')} /!state,
 
   state(settings) = new state_ctor(settings.history_   || {before: [], after: []},                settings.values_  || [],     text,
                                    settings.selection_ || {start: text.length, end: text.length}, settings.context_ || window, settings.compiler_ || compiler) -where [text = settings.text_ || ''],
@@ -1839,7 +1840,7 @@ immutable state objects that can be retrieved and set by using the val() method.
   interact(s, e) = e.type === 'keypress' ? e.which === 13 ? s.evaluate() : s.accept(e.which)
                  : e.type === 'keydown'  ? e.which === 38 ? s.previous()
                                          : e.which === 40 ? s.next() : s
-                 : s,
+                 : s
 
 Autocompletion.
 We can trivially autocomplete any subexpression that does not involve a method call. To do this, we need to very primitively lex the input starting backwards from the current selection point and ending
